@@ -29,6 +29,23 @@
         }
       }
     },
+    "roi_finder_options": {
+      "title": "ROI finder options",
+      "type": "object",
+      "properties": {
+        "roi_finder": {
+          "type": "boolean",
+          "default": false,
+          "description": "Detect individual tissue regions and write one OME-TIFF per ROI instead of a single stitched image. Useful when a slide contains multiple spatially separated tissue sections."
+        },
+        "roi_scale": {
+          "type": "integer",
+          "default": 8,
+          "minimum": 1,
+          "description": "Downscale factor for the occupancy map used in ROI detection. Higher values are faster but may merge nearby tissue sections."
+        }
+      }
+    },
     "generic_options": {
       "title": "Generic options",
       "type": "object",
@@ -56,6 +73,7 @@
   },
   "allOf": [
     { "$ref": "#/$defs/input_output_options" },
+    { "$ref": "#/$defs/roi_finder_options" },
     { "$ref": "#/$defs/generic_options" }
   ]
 }

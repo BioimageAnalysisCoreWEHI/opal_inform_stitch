@@ -2,12 +2,13 @@ from aicsimageio import AICSImage
 import os
 import numpy as np
 import dask.array as da
-import numpy as np
 from matplotlib import pyplot as plt
 import re
 from tifffile import TiffWriter
 import tifffile
 from skimage.transform import resize
+from skimage.measure import label, regionprops
+from skimage.morphology import closing, square
 
 from xml.etree import ElementTree as ET
 import argparse
@@ -19,6 +20,10 @@ def main():
     )
     parser.add_argument('fpath', help="Path to folder of images")
     parser.add_argument('--outdir', default='.', help="Output directory for stitched OME-TIFF (default: current directory)")
+    parser.add_argument('--roi_finder', action='store_true',
+                        help="Detect individual tissue regions and write one OME-TIFF per ROI instead of a single stitched image")
+    parser.add_argument('--roi_scale', type=int, default=8,
+                        help="Downscale factor for the occupancy map used in ROI detection (default: 8)")
     args = parser.parse_args()
 
     fpath = args.fpath.rstrip('/')
@@ -147,8 +152,76 @@ def main():
     print(im_xmin)
     print(im_ymin)
 
-    im_to_write = stitched_image.compute()  # materialize before resize
+    full_image = stitched_image.compute()  # materialize the full stitched dask array
 
+    tiff_options = dict(
+        tile=(512, 512),
+        compression='zlib',
+        metadata={
+            'axes': 'TCZYX',
+            'PhysicalSizeX': pixelScale,
+            'PhysicalSizeY': pixelScale,
+            'Channel': {'Name': names, 'Color': new_colors}
+        }
+    )
+
+    if args.roi_finder:
+        crops = find_rois(full_image, scale_by=args.roi_scale)
+        print(f'ROI finder detected {len(crops)} tissue region(s)', flush=True)
+        for idx, crop in enumerate(crops):
+            outPath = os.path.join(outDir, f'{label_prefix}_{label}_roi_{idx}.ome.tif')
+            write_pyramid(crop, outPath, tiff_options)
+    else:
+        outPath = os.path.join(outDir, f'{label_prefix}_{label}.ome.tif')
+        write_pyramid(full_image, outPath, tiff_options)
+
+
+def find_rois(full_image, scale_by=8):
+    """
+    Detect spatially distinct tissue regions in a stitched image and return
+    a list of cropped numpy arrays, one per region.
+
+    Strategy:
+      1. Build a binary occupancy map at 1/scale_by resolution.
+      2. Morphological closing fills tiny gaps between adjacent tiles.
+      3. Connected-component labelling identifies each tissue section.
+      4. Each labelled region's bounding box is scaled back to full resolution
+         and used to crop the full stitched image.
+    """
+    # Collapse to 2-D occupancy map using the first channel, first z/t
+    # full_image shape: (1, C, 1, H, W)
+    occupancy = full_image[0, 0, 0, :, :]  # (H, W)
+
+    h, w = occupancy.shape
+    small = np.zeros((h // scale_by, w // scale_by), dtype=np.uint8)
+
+    # Mark every pixel that has any signal
+    small_occ = (occupancy[::scale_by, ::scale_by] > 0).astype(np.uint8)
+    small[:small_occ.shape[0], :small_occ.shape[1]] = small_occ
+
+    closed = closing(small, square(3))
+    labelled = label(closed)
+    regions = regionprops(labelled)
+
+    print(f'Occupancy map shape: {small.shape}, regions found: {len(regions)}', flush=True)
+
+    crops = []
+    for r in regions:
+        # bbox is (min_row, min_col, max_row, max_col) i.e. (y0, x0, y1, x1)
+        y0, x0, y1, x1 = r.bbox
+        # Scale back to full resolution
+        y0 = y0 * scale_by
+        x0 = x0 * scale_by
+        y1 = min(y1 * scale_by, full_image.shape[3])
+        x1 = min(x1 * scale_by, full_image.shape[4])
+        print(f'  ROI bbox (full res): y={y0}:{y1}, x={x0}:{x1}', flush=True)
+        crops.append(full_image[:, :, :, y0:y1, x0:x1])
+
+    return crops
+
+
+def write_pyramid(im_to_write, outPath, tiff_options):
+    """Write a numpy array as a 3-level pyramidal OME-TIFF."""
     subFig1 = resize(im_to_write, (
         im_to_write.shape[0],
         im_to_write.shape[1],
@@ -156,7 +229,6 @@ def main():
         im_to_write.shape[3] // 4,
         im_to_write.shape[4] // 4
     ))
-
     subFig2 = resize(subFig1, (
         subFig1.shape[0],
         subFig1.shape[1],
@@ -165,25 +237,14 @@ def main():
         subFig1.shape[4] // 4
     ))
 
-    outPath = os.path.join(outDir, f'{label_prefix}_{label}.ome.tif')
     os.makedirs(os.path.dirname(os.path.abspath(outPath)), exist_ok=True)
+    print(f'Writing file {outPath}', flush=True)
     with TiffWriter(outPath, bigtiff=True) as tif:
-
-        options = dict(tile=(512, 512), compression='zlib',
-                       metadata={'axes': 'TCZYX',
-                                 'PhysicalSizeX': pixelScale,
-                                 'PhysicalSizeY': pixelScale,
-                                 'Channel': {'Name': names, 'Color': new_colors}
-                                 }
-                       )
-
-        print('writing file %s' % outPath, flush=True)
-        tif.write(im_to_write, subifds=2, **options)
-        # save pyramid levels to the two subifds
-        print("Pyramid resolution 1", flush=True)
-        tif.write(subFig1, subfiletype=1, **options)
-        print("Pyramid resolution 2", flush=True)
-        tif.write(subFig2, subfiletype=1, **options)
+        tif.write(im_to_write, subifds=2, **tiff_options)
+        print('  Pyramid resolution 1', flush=True)
+        tif.write(subFig1, subfiletype=1, **tiff_options)
+        print('  Pyramid resolution 2', flush=True)
+        tif.write(subFig2, subfiletype=1, **tiff_options)
 
 
 def get_tif_files(directory):

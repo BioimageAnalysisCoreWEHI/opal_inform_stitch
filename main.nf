@@ -15,12 +15,14 @@ process STITCH_SAMPLE {
     path "*.ome.tif", emit: stitched
 
     script:
+    def roi_args = params.roi_finder ? "--roi_finder --roi_scale ${params.roi_scale}" : ""
     """
     set -euo pipefail
 
-    python "${projectDir}/bin/inform_stitch.py" \
-        "${sample_dir}" \
-        --outdir . \
+    python "${projectDir}/bin/inform_stitch.py" \\
+        "${sample_dir}" \\
+        --outdir . \\
+        ${roi_args} \\
         2>&1 | tee stitch_${sample_name}.log
     """
 }
