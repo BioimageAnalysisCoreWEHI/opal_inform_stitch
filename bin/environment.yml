@@ -1,0 +1,16 @@
+name: opal_inform_stitch
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - aicsimageio>=4.14
+  - dask>=2023.1
+  - numpy>=1.24
+  - matplotlib>=3.7
+  - tifffile>=2023.1
+  - scikit-image>=0.21
+  - lxml
+  - pip
+  - pip:
+    - aicspylibczi
+    - fsspec

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/BioimageAnalysisCoreWEHI/opal_inform_stitch/main/nextflow_schema.json",
+  "title": "opal_inform_stitch pipeline parameters",
+  "description": "Nextflow pipeline for stitching Opal/inForm images from Vectra Polaris in parallel",
+  "type": "object",
+  "$defs": {
+    "input_output_options": {
+      "title": "Input/output options",
+      "type": "object",
+      "required": ["base_dir", "outdir"],
+      "properties": {
+        "base_dir": {
+          "type": "string",
+          "format": "directory-path",
+          "exists": true,
+          "description": "Base directory containing one subdirectory per slide/sample. Each subdirectory must contain component_data TIFF tiles from inForm."
+        },
+        "outdir": {
+          "type": "string",
+          "format": "directory-path",
+          "description": "Output directory for stitched OME-TIFF files."
+        },
+        "publish_dir_mode": {
+          "type": "string",
+          "default": "copy",
+          "description": "Method used by Nextflow publishDir to stage output files.",
+          "enum": ["symlink", "rellink", "link", "copy", "copyNoFollow", "move"]
+        }
+      }
+    },
+    "generic_options": {
+      "title": "Generic options",
+      "type": "object",
+      "properties": {
+        "help": {
+          "type": "boolean",
+          "default": false,
+          "description": "Display help text.",
+          "hidden": true
+        },
+        "version": {
+          "type": "boolean",
+          "default": false,
+          "description": "Display version and exit.",
+          "hidden": true
+        },
+        "monochrome_logs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Do not use coloured log outputs.",
+          "hidden": true
+        }
+      }
+    }
+  },
+  "allOf": [
+    { "$ref": "#/$defs/input_output_options" },
+    { "$ref": "#/$defs/generic_options" }
+  ]
+}
