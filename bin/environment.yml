@@ -9,7 +9,6 @@ dependencies:
   - matplotlib>=3.7
   - tifffile>=2023.1
   - scikit-image>=0.21
-  - lxml
   - pip
   - pip:
     - aicspylibczi
