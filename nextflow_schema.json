@@ -50,6 +50,10 @@
       "title": "Generic options",
       "type": "object",
       "properties": {
+        "container": {
+          "type": "string",
+          "description": "Path to opal_inform_stitch.sif, for -profile apptainer or singularity (build it from containers/opal_inform_stitch.def)"
+        },
         "help": {
           "type": "boolean",
           "default": false,

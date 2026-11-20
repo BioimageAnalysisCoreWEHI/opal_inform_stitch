@@ -1,0 +1,15 @@
+# Environment of the stitching container (containers/opal_inform_stitch.def).
+# aicsimageio 4.14.0 requires tifffile < 2022.4.22 and scikit-image < 0.23, which conda-forge provides for Python <= 3.11.
+# The exact package list of the built image is in containers/environment.lock.txt.
+name: opal_inform_stitch
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11.18
+  - aicsimageio=4.14.0
+  - tifffile=2022.4.8
+  - numpy=1.26.4
+  - dask=2024.11.2
+  - scikit-image=0.20.0
+  - matplotlib-base=3.10.9
+  - imagecodecs=2025.8.2
