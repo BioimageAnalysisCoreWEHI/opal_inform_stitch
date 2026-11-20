@@ -1,0 +1,33 @@
+Bootstrap: docker
+From: mambaorg/micromamba:2.0.5
+
+# Python environment for stitching inForm component tiles (bin/inform_stitch.py, original_scripts/inform_stitch.py)
+# and for original_scripts/fix_ome_tiff.py. The scripts are also copied into the image (/opt/opal_inform_stitch).
+# Build (no root needed on most HPC systems), from the repository root:
+#   apptainer build --fakeroot opal_inform_stitch.sif containers/opal_inform_stitch.def
+
+%files
+  containers/environment.yml /opt/opal_inform_stitch/environment.yml
+  bin/inform_stitch.py /opt/opal_inform_stitch/bin/inform_stitch.py
+  original_scripts/inform_stitch.py /opt/opal_inform_stitch/original_scripts/inform_stitch.py
+  original_scripts/fix_ome_tiff.py /opt/opal_inform_stitch/original_scripts/fix_ome_tiff.py
+
+%post
+  set -eu
+  # procps: Nextflow needs `ps` inside the container to collect task metrics
+  apt-get update -qq && apt-get install -y -qq --no-install-recommends procps >/dev/null && rm -rf /var/lib/apt/lists/*
+  micromamba install -y -q -n base -f /opt/opal_inform_stitch/environment.yml
+  micromamba clean -a -y -q
+  micromamba env export -n base --explicit > /opt/opal_inform_stitch/environment.lock.txt
+  chmod -R a+rX /opt/opal_inform_stitch
+
+%environment
+  export PATH=/opt/conda/bin:$PATH
+  export PYTHONNOUSERSITE=1
+  export MPLCONFIGDIR=/tmp
+
+%test
+  /opt/conda/bin/python -c "import aicsimageio, tifffile, numpy, dask, skimage; print('aicsimageio', aicsimageio.__version__, 'tifffile', tifffile.__version__, 'numpy', numpy.__version__, 'dask', dask.__version__, 'scikit-image', skimage.__version__)"
+
+%labels
+  Description Stitching of Opal/inForm component tiles and OME-TIFF channel renaming (opal_inform_stitch)

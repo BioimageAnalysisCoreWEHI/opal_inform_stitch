@@ -5,6 +5,7 @@ process STITCH_SAMPLE {
     label 'process_stitch'
 
     conda "${projectDir}/bin/environment.yml"
+    container params.container
 
     publishDir "${params.outdir}", mode: params.publish_dir_mode
 
@@ -23,7 +24,7 @@ process STITCH_SAMPLE {
         "${sample_dir}" \\
         --outdir . \\
         ${roi_args} \\
-        2>&1 | tee stitch_${sample_name}.log
+        2>&1 | tee "stitch_${sample_name}.log"
     """
 }
 
@@ -33,6 +34,9 @@ workflow {
     }
     if (!params.outdir) {
         error "Missing required parameter: --outdir"
+    }
+    if (workflow.containerEngine && !params.container) {
+        error "Missing required parameter for -profile ${workflow.profile}: --container (path to opal_inform_stitch.sif)"
     }
 
     def baseDir = file(params.base_dir)
